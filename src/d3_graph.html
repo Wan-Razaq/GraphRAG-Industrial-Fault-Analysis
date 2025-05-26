@@ -1,0 +1,142 @@
+<!-- d3_graph.html -->
+  <div id="graph-container" style="width: 100%; height: 600px; border: 1px solid #ccc; background-color: white;"></div>
+  
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+  const data = {{GRAPH_DATA_JSON}};
+  const container = document.getElementById("graph-container");
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  
+  const svg = d3.select("#graph-container")
+    .append("svg")
+    .attr("viewBox", [0, 0, width, height])
+    .style("width", "100%")
+    .style("height", "100%")
+    .call(d3.zoom().on("zoom", (event) => {
+      g.attr("transform", event.transform);
+    }));
+  
+  const g = svg.append("g");
+  
+  // Draw links
+  const link = g.selectAll("line")
+    .data(data.links)
+    .enter()
+    .append("line")
+    .attr("stroke", "#ccc")
+    .attr("stroke-width", 1.8);
+  
+  // Relationship type (link label) on hover
+  const linkLabels = g.selectAll(".link-label")
+    .data(data.links)
+    .enter()
+    .append("text")
+    .attr("class", "link-label")
+    .text(d => d.type)
+    .style("font-size", "10px")
+    .style("fill", "#999")
+    .style("display", "none");
+  
+  const node = g.selectAll("circle")
+    .data(data.nodes)
+    .enter()
+    .append("circle")
+    .attr("r", 10)
+    .attr("fill", d => {
+      if (d.type === "location") return "#e377c2";
+      if (d.type === "symptom") return "#1f77b4";
+      if (d.type === "reason") return "#ff7f0e";
+      if (d.type === "measure") return "#2ca02c";
+      return "#ccc";
+    })
+    .on("mouseover", function(event, d) {
+      if (d.type !== "location") {
+        d3.select(`#hover-label-${d.id}`).style("display", "block");
+      }
+      // Show matching link label on hover
+      linkLabels.style("display", function(link) {
+        return link.source.id === d.id || link.target.id === d.id ? "block" : "none";
+      });
+    })
+    .on("mouseout", function(event, d) {
+      if (d.type !== "location") {
+        d3.select(`#hover-label-${d.id}`).style("display", "none");
+      }
+      linkLabels.style("display", "none");
+    })
+    .call(d3.drag()
+      .on("start", dragStarted)
+      .on("drag", dragged)
+      .on("end", dragEnded)
+    );
+  
+  const labels = g.selectAll(".label")
+    .data(data.nodes)
+    .enter()
+    .append("text")
+    .attr("id", d => `hover-label-${d.id}`)
+    .text(d => d.label)
+    .attr("x", d => d.x)
+    .attr("y", d => d.y)
+    .style("font-size", "10px")
+    .style("fill", "#222")
+    .style("display", d => d.type === "location" ? "block" : "none");
+  
+  node.append("title").text(d => d.label);
+  
+  const simulation = d3.forceSimulation(data.nodes)
+    .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
+    .force("charge", d3.forceManyBody().strength(-250))
+    .force("center", d3.forceCenter(width / 2, height / 2));
+  
+  simulation.on("tick", () => {
+    link
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+  
+    node
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y);
+  
+    labels
+      .attr("x", d => d.x + 10)
+      .attr("y", d => d.y + 5);
+  
+    linkLabels
+      .attr("x", d => (d.source.x + d.target.x) / 2)
+      .attr("y", d => (d.source.y + d.target.y) / 2);
+  });
+  
+  // --- Drag logic
+  function dragStarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+  function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+  function dragEnded(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+  
+  // --- Expand logic
+  function toggleExpand() {
+    const btn = document.getElementById("expand-btn");
+    const graph = document.getElementById("graph-container");
+    if (graph.style.height === "90vh") {
+      graph.style.height = "600px";
+      btn.textContent = "↔ Expand Graph";
+    } else {
+      graph.style.height = "90vh";
+      btn.textContent = "↩ Collapse";
+    }
+  }
+  </script>
+  

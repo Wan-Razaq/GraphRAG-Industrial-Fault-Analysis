@@ -1,0 +1,28 @@
+# Sensitive environment files
+.env
+
+# Python virtual environments
+.venv/
+venv/
+
+# Python cache and temporary files
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Data (as it's proprietary)
+data/raw/*
+data/processed/*
+!data/.gitkeep
+
+# Generated files from BAML (if you regenerate often)
+src/models/baml/baml_client/
+
+# Other unwanted file types
+*.xlsx
+*.csv
+*.json
+*.jsonl
+
+# Trained model files if large or proprietary
+trained_models/*
