@@ -1,19 +1,18 @@
-from openai import OpenAI
-from langdetect import detect
-from dotenv import load_dotenv
 import os
-import openai
+from pathlib import Path
+from dotenv import load_dotenv
+from langdetect import detect
+from openai import OpenAI
 
-client = OpenAI()
 
 # Load environment variables from .env file
-load_dotenv()
+env_path = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # Read API key from environment
 openai_api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_api_key)
 
-# Assign to OpenAI library
-openai.api_key = openai_api_key
 
 # Choose the model
 OPENAI_MODEL = "gpt-3.5-turbo"
@@ -31,11 +30,14 @@ def generate_answer(messages_history: str, graph_context: str, user_lang: str) -
 
     #prompt for retriever behaviour and language (tuple)
     system_msg = (
-        f"You are an industrial maintenance assistant chatbot. "
+        f"You are an assistant specialized in industrial maintenance and troubleshooting. "
+        f"Your role is to generate accurate, natural-language recommendations for technicians working with manufacturing equipment, particularly the Ion Beam Machine. "
         f"The user is currently speaking in {'Dutch' if user_lang == 'nl' else 'English'}, so respond in that language. "
-        f"Use the provided graph context for factual information when relevant and mark such content explicitly as [Graph]. "
-        f"For answers not found in the graph, rely on your general knowledge and mark them as [LLM]. "
-        f"If the user's question is unrelated to the graph context, respond only with [LLM] knowledge."
+        f"Use the provided knowledge graph context for factual information when relevant, and clearly mark such content as [Graph]. "
+        f"Begin each response by briefly explaining any key concepts or entities from the user's question, especially if they relate to the Ion Beam Machine. "
+        f"Then, provide a complete answer that incorporates relevant information from the knowledge graph (if any). "
+        f"If the answer cannot be grounded in the graph, rely on your general knowledge and mark those parts as [LLM]. "
+        f"If the question is unrelated to the Ion Beam Machine or the graph content, answer based on [LLM] knowledge only."
     )
 
     # Build up message history

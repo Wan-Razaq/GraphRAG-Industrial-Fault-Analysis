@@ -2,9 +2,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 import json
 
-from chatbot_service import detect_language, generate_answer
-from retriever import retriever  # HybridCypherRetriever instance
+from utils.chatbot_service import detect_language, generate_answer
+from utils.retriever import retriever  # HybridCypherRetriever instance
 from pathlib import Path
+
+st.set_page_config(layout="wide", page_title="Chatbot Fault Diagnosis Assistant with Knowledge Graph Context")
 
 if "conversations" not in st.session_state:
     st.session_state.conversations = [{
@@ -45,7 +47,6 @@ if st.sidebar.button("Start New Conversation", key="new_conv"):
 # --- Main Interface (Center Panel) ---
 st.title("Chatbot Assistant with Knowledge Graph Context")
 
-
 # Initialize expand state if it doesn't exist yet
 if "graph_expanded" not in st.session_state:
     st.session_state.graph_expanded = False
@@ -57,25 +58,25 @@ if st.button(expand_button_label, key="expand_graph"):
 
 # Change layout dynamically based on state
 if st.session_state.graph_expanded:
-    chat_col, graph_col = st.columns([0.5, 0.5])  # Half-half expanded view
+    chat_col, graph_col = st.columns([0.4, 0.6])  # Half-half expanded view
 else:
     chat_col, graph_col = st.columns([0.7, 0.3])  # Default view
 
 # Chat history and input in the chat_col
 with chat_col:
-    # Form for new question input
-    with st.form(key="question_form", clear_on_submit=True):
-        user_input = st.text_input("Ask a question:", placeholder="Type your question here...")
-        submit_clicked = st.form_submit_button("Send")
+    # 1. Handle input submission FIRST (before rendering messages)
+    with st.form(key="chat_input_form", clear_on_submit=True):
+        user_input = st.text_input(
+            "Ask a question...",
+            label_visibility="collapsed",
+            placeholder="Ask your question here"
+        )
+        submit_clicked = st.form_submit_button("➤ Send")
 
     if submit_clicked and user_input:
-        # 1. Detect language of the user input
         lang = detect_language(user_input)
-
-        # 2. Retrieve relevant graph context using the retriever
         retriever_result = retriever.search(query_text=user_input, top_k=5)
 
-        # 3. Prepare the concise context string for LLM prompt
         context_str = ""
         node_dict = {}
         links = []
@@ -114,35 +115,46 @@ with chat_col:
         if not context_str:
             context_str = "(No direct graph context found; relying on general knowledge.)"
 
-        # Use latest user language if conversation exists
         lang_used = lang
         for msg in reversed(current_conv["messages"]):
             if msg["role"] == "user" and "lang" in msg:
                 lang_used = msg["lang"]
                 break
 
-        # Include previous messages plus current question
         conversation_so_far = current_conv["messages"] + [{"role": "user", "content": user_input}]
         answer = generate_answer(conversation_so_far, context_str, lang_used)
 
-        # 5. Store conversation and graph data
         current_conv["messages"].append({"role": "user", "content": user_input, "lang": lang})
         current_conv["messages"].append({"role": "assistant", "content": answer})
         current_conv["latest_graph"] = {"nodes": list(node_dict.values()), "links": links}
 
+    # 2. Now render the messages AFTER the state update
+    with st.container():
+        st.markdown('<div id="chat-box" class="chat-container">', unsafe_allow_html=True)
 
-    # 🔁 Now display messages AFTER the form and answer generation
-    for msg in current_conv["messages"]:
-        if msg["role"] == "user":
-            st.markdown(f"**💬 User:** {msg['content']}")
-        else:
-            st.markdown(f"**🤖 Assistant:** {msg['content']}")
+        # Group messages into pairs: (user, assistant)
+        pairs = []
+        msgs = current_conv["messages"]
+        i = 0
+        while i < len(msgs) - 1:
+            if msgs[i]["role"] == "user" and msgs[i+1]["role"] == "assistant":
+                pairs.append((msgs[i], msgs[i+1]))
+                i += 2
+            else:
+                i += 1  # Skip broken pair
+
+        # Show latest pair first, but user before assistant in each pair
+        for user_msg, assistant_msg in reversed(pairs):
+            st.markdown(f'<div class="chat-message">💬 <strong>User:</strong> {user_msg["content"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-message">🤖 <strong>Assistant:</strong> {assistant_msg["content"]}</div>', unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Graph Visualization (Right Panel) ---
 with graph_col:
     graph_data = current_conv.get("latest_graph", {"nodes": [], "links": []})
     if graph_data and graph_data.get("nodes"):
-        template_path = Path("d3_graph.html")
+        template_path = Path("src/d3_graph.html")
         template = template_path.read_text()
         filled_template = template.replace("{{GRAPH_DATA_JSON}}", json.dumps(graph_data))
         components.html(filled_template, height=650, scrolling=True)

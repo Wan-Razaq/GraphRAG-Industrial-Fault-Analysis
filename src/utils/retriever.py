@@ -9,7 +9,7 @@ import codecs
 from neo4j_graphrag.retrievers import HybridCypherRetriever
 from neo4j_graphrag.embeddings import OpenAIEmbeddings
 
-env_path = Path(__file__).parent / ".env"
+env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=env_path, encoding="utf-8-sig")
 
 # Read environment variables
