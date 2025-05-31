@@ -138,3 +138,22 @@ function ExtractFaultsFromImage(img: image) -> FaultReport[] {
     {{ img }}
   "#
 }
+
+//
+// --- TESTS GO HERE, after everything else ---
+//
+
+test TestExtraction {
+  functions [ExtractFaultInfo]
+  args {
+    log_text #"
+      Pomp 5 lekt bij de aansluiting door een versleten pakking; pakking vervangen \Resolution Status: Unknown.
+    "#
+  }
+  @@assert(location_name, {{ this.fault_location.name == "Pomp 5" }})
+  @@assert(location_machine, {{ this.fault_location.machine is none }})
+  @@assert(symptom_extracted, {{ this.fault_symptoms | length == 1 and this.fault_symptoms[0] == "lekt bij de aansluiting" }})
+  @@assert(reason_extracted, {{ this.fault_reason | length == 1 and this.fault_reason[0].name == "versleten pakking" }})
+  @@assert(measure_extracted, {{ this.fault_measures | length == 1 and this.fault_measures[0].description == "pakking vervangen" }})
+  @@assert(status_unknown, {{ this.resolution_status == "Unknown" }})
+}
