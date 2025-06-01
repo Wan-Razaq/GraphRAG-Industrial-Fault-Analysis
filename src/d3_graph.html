@@ -86,9 +86,11 @@
   node.append("title").text(d => d.label);
   
   const simulation = d3.forceSimulation(data.nodes)
-    .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
-    .force("charge", d3.forceManyBody().strength(-250))
-    .force("center", d3.forceCenter(width / 2, height / 2));
+    .force("link", d3.forceLink(data.links).id(d => d.id).distance(50))
+    .force("charge", d3.forceManyBody().strength(-200))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("x", d3.forceX(width / 2).strength(0.05))   
+    .force("y", d3.forceY(height / 2).strength(0.05))
   
   simulation.on("tick", () => {
     link
