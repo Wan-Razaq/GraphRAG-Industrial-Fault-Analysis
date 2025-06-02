@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import json
+import pandas as pd
 
 from utils.chatbot_service import detect_language, generate_answer
 from utils.retriever import retriever  # HybridCypherRetriever instance
@@ -8,6 +9,7 @@ from pathlib import Path
 
 st.set_page_config(layout="wide", page_title="Chatbot Fault Diagnosis Assistant with Knowledge Graph Context")
 
+# Session State and Conversations
 if "conversations" not in st.session_state:
     st.session_state.conversations = [{
     "title": "Conversation 1",
@@ -74,12 +76,14 @@ with chat_col:
         submit_clicked = st.form_submit_button("➤ Send")
 
     if submit_clicked and user_input:
+        st.session_state.table_rows = []
         lang = detect_language(user_input)
         retriever_result = retriever.search(query_text=user_input, top_k=5)
 
         context_str = ""
         node_dict = {}
         links = []
+        table_set = set()
 
         for item in retriever_result.items:
             meta = item.metadata
@@ -104,12 +108,24 @@ with chat_col:
             snippet = ""
             if meta.get("location"):
                 snippet += f"Location: {meta['location']}\n"
+                if ( "FaultLocation", meta["location"]) not in table_set:
+                    st.session_state.table_rows.append({"Entity": "FaultLocation", "Remarks": meta["location"]})
+                    table_set.add(( "FaultLocation", meta["location"] ))
             if meta.get("symptom"):
                 snippet += f"Symptom: {meta['symptom']}\n"
+                if ( "FaultSymptom", meta["symptom"]) not in table_set:
+                    st.session_state.table_rows.append({"Entity": "FaultSymptom", "Remarks": meta["symptom"]})
+                    table_set.add(( "FaultSymptom", meta["symptom"] ))
             if meta.get("reason"):
                 snippet += f"Reason: {meta['reason']}\n"
+                if ( "FaultReason", meta["reason"]) not in table_set:
+                    st.session_state.table_rows.append({"Entity": "FaultReason", "Remarks": meta["reason"]})
+                    table_set.add(( "FaultReason", meta["reason"] ))
             if meta.get("measure"):
                 snippet += f"Measure: {meta['measure']}\n"
+                if ( "FaultMeasure", meta["measure"]) not in table_set:
+                    st.session_state.table_rows.append({"Entity": "FaultMeasure", "Remarks": meta["measure"]})
+                    table_set.add(( "FaultMeasure", meta["measure"] ))
             context_str += snippet + "\n"
 
         if not context_str:
@@ -127,6 +143,22 @@ with chat_col:
         current_conv["messages"].append({"role": "user", "content": user_input, "lang": lang})
         current_conv["messages"].append({"role": "assistant", "content": answer})
         current_conv["latest_graph"] = {"nodes": list(node_dict.values()), "links": links}
+
+        # Collect all element IDs for Cypher query
+        node_ids = [f"'{node['id']}'" for node in node_dict.values()]
+        id_list_str = ", ".join(node_ids)
+
+        # Prepare Cypher query string for copy-paste
+        cypher_query = f"""
+        // Copy-paste this query into Neo4j Browser to visualize the subgraph
+        MATCH (n)
+        WHERE elementId(n) IN [{id_list_str}]
+        OPTIONAL MATCH (n)-[r]->(m)
+        WHERE elementId(m) IN [{id_list_str}]
+        RETURN n, r, m
+        """
+        # Save to session state to persist across reruns
+        st.session_state.cypher_query = cypher_query
 
     # 2. Now render the messages AFTER the state update
     with st.container():
@@ -150,13 +182,39 @@ with chat_col:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- Graph Visualization (Right Panel) ---
+
+# --- Graph Visualization, Generated Cypher Query and Entity Table (Right Panel) ---
 with graph_col:
     graph_data = current_conv.get("latest_graph", {"nodes": [], "links": []})
-    if graph_data and graph_data.get("nodes"):
-        template_path = Path("src/d3_graph.html")
-        template = template_path.read_text()
-        filled_template = template.replace("{{GRAPH_DATA_JSON}}", json.dumps(graph_data))
-        components.html(filled_template, height=650, scrolling=True)
+    # Graph visualization inside expander
+    with st.expander("Show Knowledge Graph Visualization", expanded=True):
+        if graph_data and graph_data.get("nodes"):
+            template_path = Path("src/d3_graph.html")
+            template = template_path.read_text()
+            filled_template = template.replace("{{GRAPH_DATA_JSON}}", json.dumps(graph_data))
+            components.html(filled_template, height=650, scrolling=True)
+        else:
+            st.info("No graph data found for this question.")
+
+    if "cypher_query" in st.session_state and st.session_state.cypher_query.strip():
+        with st.expander("Show Cypher Query for Neo4j Visualization", expanded=False):
+            st.code(st.session_state.cypher_query, language="cypher")
+            st.caption("Copy-paste this Cypher query into Neo4j Browser to see the same subgraph.")
+
+    # Add table directly below the graph visualization
+    # Add show/hide table button
+    with st.expander("Show Extracted Graph Entities Table", expanded=True):
+        st.markdown("#### Extracted Graph Entities")
+        if "table_rows" in st.session_state and st.session_state.table_rows:
+            # Custom styling for table with FaultLocation highlighted
+            def style_row(row):
+                color = 'background-color: #d9d9d9;' if row["Entity"] == "FaultLocation" else ''
+                return [color, color]
+
+            styled_table = st.session_state.table_rows
+            styled_df = pd.DataFrame(styled_table)
+            st.dataframe(styled_df.style.apply(style_row, axis=1), use_container_width=True)
+        else:
+            st.info("No graph entities found for this question.")
 
             
