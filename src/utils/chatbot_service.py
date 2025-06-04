@@ -15,7 +15,7 @@ client = OpenAI(api_key=openai_api_key)
 
 
 # Choose the model
-OPENAI_MODEL = "gpt-3.5-turbo"
+OPENAI_MODEL = "gpt-4"
 
 from langdetect import detect
 
@@ -41,20 +41,14 @@ def generate_answer(messages_history: str, graph_context: str, user_lang: str) -
         f"If the question is unrelated to the Ion Beam Machine or the graph content, answer based on [LLM] knowledge only."
     )
 
-    # Build up message history
+    # Add the system message up top
     messages = [{"role": "system", "content": system_msg}]
-    messages += messages_history
 
-    # Add a combined message with both the current question and the graph context
-    last_user_msg = messages_history[-1]["content"] if messages_history else ""
-    messages.append({
-        "role": "user",
-        "content": (
-            f"Here is the graph context:\n{graph_context}\n\n"
-            f"And here is the user's current question:\n{last_user_msg}\n\n"
-            "Please answer clearly, mark with [Graph] or [LLM], and follow the correct language."
-        )
-    })
+    # Inject the graph context *just before the latest user message*, not at the end
+    *prior_messages, last_user = messages_history
+    messages.extend(prior_messages)
+    messages.append({"role": "system", "content": f"Graph context:\n{graph_context}"})
+    messages.append(last_user)
 
    # Send to OpenAI
     response = client.chat.completions.create(
