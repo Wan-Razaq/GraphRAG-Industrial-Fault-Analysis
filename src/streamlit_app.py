@@ -69,7 +69,6 @@ def graph_context_content(graph_data, cypher_query, table_rows):
         else:
             st.info("No Cypher query found.")
     with tabs[2]:
-        st.markdown("#### Extracted Graph Entities")
         if table_rows:
             def style_row(row):
                 color = 'background-color: #d9d9d9;' if row["Entity"] == "FaultLocation" else ''
@@ -111,7 +110,7 @@ user_input = st.chat_input("Ask your question here...")
 if user_input:
     table_rows = []
     lang = detect_language(user_input)
-    retriever_result = retriever.search(query_text=user_input, top_k=3)
+    retriever_result = retriever.search(query_text=user_input, top_k=2)
     
     context_str = ""
     node_dict = {}
@@ -163,42 +162,57 @@ if user_input:
 
     if not context_str:
         context_str = "(No direct graph context found; relying on general knowledge.)"
+        graph_found = bool(node_dict)
 
     lang_used = lang
     for msg in reversed(current_conv["messages"]):
         if msg["role"] == "user" and "lang" in msg:
             lang_used = msg["lang"]
             break
-
-    conversation_so_far = current_conv["messages"] + [{"role": "user", "content": user_input}]
-    answer = generate_answer(conversation_so_far, context_str, lang_used)
+    
+    #Last 3 pair of history
+    recent_messages = current_conv["messages"][-4:] + [{"role": "user", "content": user_input}]
+    answer = generate_answer(recent_messages, context_str, lang_used)
 
     current_conv["messages"].append({"role": "user", "content": user_input, "lang": lang})
     current_conv["messages"].append({"role": "assistant", "content": answer})
-    current_conv["latest_graph"] = {"nodes": list(node_dict.values()), "links": links}
+    
+    graph_found = bool(node_dict)
+    used_graph = "[Graph]" in answer
 
-    # Collect all element IDs for Cypher query
-    node_ids = [f"'{node['id']}'" for node in node_dict.values()]
-    id_list_str = ", ".join(node_ids)
-
-    # Prepare Cypher query string for copy-paste
-    cypher_query = f"""
-    MATCH (n)
-    WHERE elementId(n) IN [{id_list_str}]
-    OPTIONAL MATCH (n)-[r]->(m)
-    WHERE elementId(m) IN [{id_list_str}]
-    RETURN n, r, m
-    """
-    # Ensure latest_graphs is in sync
+    # Decide whether to include graph info or empty placeholders
     if "latest_graphs" not in current_conv:
         current_conv["latest_graphs"] = []
-    current_conv["latest_graphs"].append({
-        "graph_data": {"nodes": list(node_dict.values()), "links": links},
-        "cypher_query": cypher_query,
-        "table_rows": table_rows
-    })
-    st.rerun()
 
+    if graph_found and used_graph:
+        # Save for right-side visual panel
+        current_conv["latest_graph"] = {"nodes": list(node_dict.values()), "links": links}
+
+        node_ids = [f"'{node['id']}'" for node in node_dict.values()]
+        id_list_str = ", ".join(node_ids)
+
+        cypher_query = f"""
+        MATCH (n)
+        WHERE elementId(n) IN [{id_list_str}]
+        OPTIONAL MATCH (n)-[r]->(m)
+        WHERE elementId(m) IN [{id_list_str}]
+        RETURN n, r, m
+        """
+
+        current_conv["latest_graphs"].append({
+            "graph_data": {"nodes": list(node_dict.values()), "links": links},
+            "cypher_query": cypher_query,
+            "table_rows": table_rows
+        })
+    else:
+        current_conv["latest_graph"] = {"nodes": [], "links": []}
+        current_conv["latest_graphs"].append({
+            "graph_data": {"nodes": [], "links": []},
+            "cypher_query": "",
+            "table_rows": []
+        })
+
+    st.rerun()
 
 
 
