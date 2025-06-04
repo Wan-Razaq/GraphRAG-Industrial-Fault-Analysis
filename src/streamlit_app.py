@@ -50,6 +50,7 @@ if st.sidebar.button("Start New Conversation", key="new_conv"):
 # Helper to generate graph, cypher, and table for a given answer
 def graph_context_content(graph_data, cypher_query, table_rows):
     tabs = st.tabs(["Graph Visualization", "Cypher Query", "Extracted Entities Table"])
+    neo4j_browser_url = "https://9ce13d2b.databases.neo4j.io/browser/"
     with tabs[0]:
         if graph_data and graph_data.get("nodes"):
             template_path = Path("src/d3_graph.html")
@@ -61,7 +62,10 @@ def graph_context_content(graph_data, cypher_query, table_rows):
     with tabs[1]:
         if cypher_query and cypher_query.strip():
             st.code(cypher_query, language="cypher")
-            st.caption("Copy-paste this Cypher query into Neo4j Browser to see the same subgraph.")
+            st.markdown(
+                f"Copy-paste this Cypher query to visualize the graph &nbsp; &rarr; [Open Graph Database]({neo4j_browser_url})",
+                unsafe_allow_html=True
+            )
         else:
             st.info("No Cypher query found.")
     with tabs[2]:

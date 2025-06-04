@@ -32,6 +32,7 @@ def generate_answer(messages_history: str, graph_context: str, user_lang: str) -
     system_msg = (
         f"You are an assistant specialized in industrial maintenance and troubleshooting. "
         f"Your role is to generate accurate, natural-language recommendations for technicians working with manufacturing equipment, particularly the Ion Beam Machine. "
+        f"You can see the full conversation history in this chat and should use it to answer follow-up questions. "
         f"The user is currently speaking in {'Dutch' if user_lang == 'nl' else 'English'}, so respond in that language. "
         f"Use the provided knowledge graph context for factual information when relevant, and clearly mark such content as [Graph]. "
         f"Begin each response by briefly explaining any key concepts or entities from the user's question, especially if they relate to the Ion Beam Machine. "
