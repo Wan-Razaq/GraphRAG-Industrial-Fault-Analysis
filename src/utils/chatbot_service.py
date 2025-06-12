@@ -15,7 +15,7 @@ client = OpenAI(api_key=openai_api_key)
 
 
 # Choose the model
-OPENAI_MODEL = "gpt-4"
+OPENAI_MODEL = "gpt-4o"
 
 from langdetect import detect
 
