@@ -26,7 +26,7 @@ def detect_language(text: str) -> str:
         lang_code = "en"
     return "nl" if lang_code.startswith("nl") else "en"
 
-def generate_answer(messages_history: str, graph_context: str, user_lang: str) -> str:
+def generate_answer_stream(messages_history: str, graph_context: str, user_lang: str) -> str:
 
     #prompt for retriever behaviour and language (tuple)
     system_msg = (
@@ -50,11 +50,16 @@ def generate_answer(messages_history: str, graph_context: str, user_lang: str) -
     messages.append({"role": "system", "content": f"Graph context:\n{graph_context}"})
     messages.append(last_user)
 
-   # Send to OpenAI
-    response = client.chat.completions.create(
+   # Streaming Response
+    response_stream = client.chat.completions.create(
         model=OPENAI_MODEL,
-        messages=messages
+        messages=messages,
+        stream=True
     )
 
-    return response.choices[0].message.content
+    # Yield content tokens as they are received
+    for chunk in response_stream:
+        content_chunk = chunk.choices[0].delta.content
+        if content_chunk:
+            yield content_chunk
 

@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 import json
 import pandas as pd
 
-from utils.chatbot_service import detect_language, generate_answer
+from utils.chatbot_service import detect_language, generate_answer_stream
 from utils.retriever import retriever  # HybridCypherRetriever instance
 from pathlib import Path
 
@@ -26,37 +26,37 @@ current_conv = conversations[current_idx]
 
 # --- Sidebar: Conversation Navigation ---
 st.sidebar.title("Conversations")
-# List existing conversations with buttons for selection
 for i, conv in enumerate(conversations):
     btn_label = conv["title"]
     if st.sidebar.button(btn_label, key=f"select_{i}"):
-        # Update current conversation index when a title is clicked
         st.session_state.current_conv_index = i
-        current_idx = i
-        current_conv = conversations[i]
-# Button to start a new conversation
+        st.rerun()  
 if st.sidebar.button("Start New Conversation", key="new_conv"):
     new_index = len(conversations)
     conversations.append({
         "title": f"Conversation {new_index+1}",
         "messages": [],
+        "latest_graphs": [],
         "latest_graph": {"nodes": [], "links": []}
     })
     st.session_state.current_conv_index = new_index
-    current_idx = new_index
-    current_conv = conversations[new_index]
+    st.rerun()
 
 # --- Main Interface (Single Page, no columns) ---
 # Helper to generate graph, cypher, and table for a given answer
-def graph_context_content(graph_data, cypher_query, table_rows):
+def graph_context_content(graph_data, cypher_query, table_rows, *, pair_id):
     tabs = st.tabs(["Graph Visualization", "Cypher Query", "Extracted Entities Table"])
     neo4j_browser_url = "https://9ce13d2b.databases.neo4j.io/browser/"
     with tabs[0]:
         if graph_data and graph_data.get("nodes"):
+            ph = st.empty() 
             template_path = Path("src/d3_graph.html")
             template = template_path.read_text()
-            filled_template = template.replace("{{GRAPH_DATA_JSON}}", json.dumps(graph_data))
-            components.html(filled_template, height=400, scrolling=True)
+            html_str = template_path.read_text().replace(
+                "{{GRAPH_DATA_JSON}}", json.dumps(graph_data)
+            )
+            with ph:                                   # <--- use it as a container
+                components.html(html_str, height=400, scrolling=True)
         else:
             st.info("No graph data found for this question.")
     with tabs[1]:
@@ -97,7 +97,7 @@ while i < len(current_conv["messages"]):
                 cypher_query = current_conv["latest_graphs"][pair_idx].get("cypher_query", "")
                 table_rows = current_conv["latest_graphs"][pair_idx].get("table_rows", [])
                 with st.expander("Show Knowledge Graph Context", expanded=False):
-                    graph_context_content(graph_data, cypher_query, table_rows)
+                    graph_context_content(graph_data, cypher_query, table_rows, pair_id=pair_idx)
             pair_idx += 1
         i += 2
     else:
@@ -108,6 +108,22 @@ while i < len(current_conv["messages"]):
 user_input = st.chat_input("Ask your question here...")
     
 if user_input:
+    st.session_state.pending_user_input = user_input
+    st.rerun()
+
+if "pending_user_input" in st.session_state:
+    user_input = st.session_state.pending_user_input
+
+    # 1) show the question right away
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    # 2) persist it in the conversation for future reruns
+    current_conv["messages"].append(
+        {"role": "user", "content": user_input, "lang": detect_language(user_input)}
+    )
+
+    # --- Info Extraction for Graph Context etc. ---
     table_rows = []
     lang = detect_language(user_input)
     retriever_result = retriever.search(query_text=user_input, top_k=2)
@@ -163,6 +179,8 @@ if user_input:
     if not context_str:
         context_str = "(No direct graph context found; relying on general knowledge.)"
         graph_found = bool(node_dict)
+    else:
+        graph_found = bool(node_dict)
 
     lang_used = lang
     for msg in reversed(current_conv["messages"]):
@@ -172,47 +190,52 @@ if user_input:
     
     #Last 3 pair of history
     recent_messages = current_conv["messages"][-4:] + [{"role": "user", "content": user_input}]
-    answer = generate_answer(recent_messages, context_str, lang_used)
 
-    current_conv["messages"].append({"role": "user", "content": user_input, "lang": lang})
-    current_conv["messages"].append({"role": "assistant", "content": answer})
-    
-    graph_found = bool(node_dict)
-    used_graph = "[Graph]" in answer
+    # ---- Streaming answer ----
+    def stream_response():
+        response_content = ""
+        for chunk in generate_answer_stream(recent_messages, context_str, lang_used):
+            response_content += chunk
+            yield chunk
+        # Only after the full response is received, append the assistant message
+        current_conv["messages"].append({"role": "assistant", "content": response_content})
+        st.session_state._last_answer = response_content
 
-    # Decide whether to include graph info or empty placeholders
-    if "latest_graphs" not in current_conv:
-        current_conv["latest_graphs"] = []
+        # Only after the answer is done, build and append latest_graphs once:
+        used_graph = "[Graph]" in response_content
+        if "latest_graphs" not in current_conv:
+            current_conv["latest_graphs"] = []
 
-    if graph_found and used_graph:
-        # Save for right-side visual panel
-        current_conv["latest_graph"] = {"nodes": list(node_dict.values()), "links": links}
+        if graph_found and used_graph:
+            graph_data = {"nodes": list(node_dict.values()), "links": links}
+            node_ids = [f"'{node['id']}'" for node in node_dict.values()]
+            id_list_str = ", ".join(node_ids)
+            cypher_query = f"""
+            MATCH (n)
+            WHERE elementId(n) IN [{id_list_str}]
+            OPTIONAL MATCH (n)-[r]->(m)
+            WHERE elementId(m) IN [{id_list_str}]
+            RETURN n, r, m
+            """
+            current_conv["latest_graph"] = graph_data
+            current_conv["latest_graphs"].append({
+                "graph_data": graph_data,
+                "cypher_query": cypher_query,
+                "table_rows": table_rows
+            })
+        else:
+            current_conv["latest_graph"] = {"nodes": [], "links": []}
+            current_conv["latest_graphs"].append({
+                "graph_data": {"nodes": [], "links": []},
+                "cypher_query": "",
+                "table_rows": []
+            })
+        # Clean up pending input so next question works
+        del st.session_state.pending_user_input
+        st.rerun()  # Force rerun to immediately show tabs after streaming
 
-        node_ids = [f"'{node['id']}'" for node in node_dict.values()]
-        id_list_str = ", ".join(node_ids)
-
-        cypher_query = f"""
-        MATCH (n)
-        WHERE elementId(n) IN [{id_list_str}]
-        OPTIONAL MATCH (n)-[r]->(m)
-        WHERE elementId(m) IN [{id_list_str}]
-        RETURN n, r, m
-        """
-
-        current_conv["latest_graphs"].append({
-            "graph_data": {"nodes": list(node_dict.values()), "links": links},
-            "cypher_query": cypher_query,
-            "table_rows": table_rows
-        })
-    else:
-        current_conv["latest_graph"] = {"nodes": [], "links": []}
-        current_conv["latest_graphs"].append({
-            "graph_data": {"nodes": [], "links": []},
-            "cypher_query": "",
-            "table_rows": []
-        })
-
-    st.rerun()
+    with st.chat_message("assistant"):
+        st.write_stream(stream_response)   
 
 
 
