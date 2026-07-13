@@ -2,6 +2,15 @@
 .env
 .env.*
 !.env.example
+.streamlit/secrets.toml
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
 
 # Datasets / sensitive files
 datasets/
@@ -10,7 +19,15 @@ data/
 *.jsonl
 *.csv
 *.xlsx
+*.xls
 *.pdf
+*.parquet
+*.feather
+*.pkl
+*.pickle
+*.db
+*.sqlite
+*.sqlite3
 
 # Python
 __pycache__/
@@ -21,6 +38,27 @@ env/
 
 # Jupyter
 .ipynb_checkpoints/
+notebooks/**/scratch*.ipynb
+notebooks/**/*_experiment.ipynb
+
+# Experiment outputs and generated artifacts
+experiments/**
+trained_models/
+checkpoints/
+outputs/
+logs/
+*.log
+*.pt
+*.pth
+*.bin
+*.gguf
+*.safetensors
+*.onnx
+*.ckpt
 
 # VS Code
 .vscode/
+
+# OS metadata
+.DS_Store
+Thumbs.db

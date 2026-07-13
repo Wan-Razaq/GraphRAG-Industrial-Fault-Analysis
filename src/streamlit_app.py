@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import json
+import os
 import pandas as pd
 
 from utils.chatbot_service import detect_language, generate_answer_stream
@@ -46,13 +47,12 @@ if st.sidebar.button("Start New Conversation", key="new_conv"):
 # Helper to generate graph, cypher, and table for a given answer
 def graph_context_content(graph_data, cypher_query, table_rows, *, pair_id):
     tabs = st.tabs(["Graph Visualization", "Cypher Query", "Extracted Entities Table"])
-    neo4j_browser_url = "https://9ce13d2b.databases.neo4j.io/browser/"
+    neo4j_browser_url = os.getenv("NEO4J_BROWSER_URL") or "https://browser.neo4j.io/"
     with tabs[0]:
         if graph_data and graph_data.get("nodes"):
             ph = st.empty() 
             template_path = Path("src/d3_graph.html")
-            template = template_path.read_text()
-            html_str = template_path.read_text().replace(
+            html_str = template_path.read_text(encoding="utf-8").replace(
                 "{{GRAPH_DATA_JSON}}", json.dumps(graph_data)
             )
             with ph:                                   # <--- use it as a container
@@ -235,8 +235,4 @@ if "pending_user_input" in st.session_state:
         st.rerun()  # Force rerun to immediately show tabs after streaming
 
     with st.chat_message("assistant"):
-        st.write_stream(stream_response)   
-
-
-
-            
+        st.write_stream(stream_response)

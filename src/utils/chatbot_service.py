@@ -11,13 +11,14 @@ load_dotenv(dotenv_path=env_path)
 
 # Read API key from environment
 openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    raise RuntimeError("Missing required environment variable: OPENAI_API_KEY")
+
 client = OpenAI(api_key=openai_api_key)
 
 
 # Choose the model
 OPENAI_MODEL = "gpt-4o"
-
-from langdetect import detect
 
 def detect_language(text: str) -> str:
     try:
@@ -62,4 +63,3 @@ def generate_answer_stream(messages_history: str, graph_context: str, user_lang:
         content_chunk = chunk.choices[0].delta.content
         if content_chunk:
             yield content_chunk
-

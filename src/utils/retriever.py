@@ -12,25 +12,34 @@ from neo4j_graphrag.embeddings import OpenAIEmbeddings
 env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=env_path, encoding="utf-8-sig")
 
-# Read environment variables
-
-# 2. Retrieve and debug:
-uri = os.getenv("NEO4J_URI", "")
-print("Loaded URI (raw repr):", repr(uri))
-
+# Read environment variables without logging sensitive connection details.
+uri = os.getenv("NEO4J_URI", "").strip()
 user = os.getenv("NEO4J_USER")
 pwd = os.getenv("NEO4J_PASS")
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# 3. Sanitize and decode:
+missing_env = [
+    name for name, value in {
+        "NEO4J_URI": uri,
+        "NEO4J_USER": user,
+        "NEO4J_PASS": pwd,
+        "OPENAI_API_KEY": openai_api_key,
+    }.items()
+    if not value
+]
+
+if missing_env:
+    raise RuntimeError(
+        "Missing required environment variables: " + ", ".join(missing_env)
+    )
+
+# Sanitize and decode URI values that were copied with escaped characters.
 if "\\x3a" in uri:
     # Decode any \xNN escapes to actual chars
     uri = codecs.decode(uri, "unicode_escape")
 elif "\\x" in uri:
     # Generic handler for any \xNN pattern:
     uri = uri.encode("utf-8").decode("unicode-escape")
-
-# 4. Final URI:
-print("Final URI:", uri)
 
 # Create Neo4j driver
 driver = GraphDatabase.driver(uri, auth=(user, pwd))
