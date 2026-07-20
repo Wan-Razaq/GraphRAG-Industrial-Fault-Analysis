@@ -213,6 +213,7 @@ More detailed documentation is available in:
 
 - [Project documentation](docs/PROJECT_DOCUMENTATION.md)
 - [Data and artifact policy](docs/DATA_AND_ARTIFACTS.md)
+- [Diagnostic demo queries](docs/DIAGNOSTIC_DEMO_QUERIES.md)
 - [Security guide](docs/SECURITY.md)
 
 ## Git And Data Safety
