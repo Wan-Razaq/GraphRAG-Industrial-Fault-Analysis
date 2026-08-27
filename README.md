@@ -152,6 +152,12 @@ The chatbot:
 - Labels graph-grounded content as `[Graph]` and general model knowledge as `[LLM]`.
 - Shows graph context, Cypher query, and extracted entities below assistant responses.
 
+## Chatbot Demo Video
+
+A short demo video is available here: [GraphRAG chatbot walkthrough](https://drive.google.com/file/d/1Q7ImftX-rYSdK8xtI3n-F9fS_8jMF1Cw/view?usp=sharing).
+
+The video demonstrates the chatbot workflow: asking an industrial fault-diagnosis question, retrieving relevant Neo4j knowledge graph context, streaming a technician-facing answer, and opening the supporting graph context with the generated Cypher query and extracted entity table.
+
 ## Knowledge Graph Model
 
 The graph centers on four node labels:

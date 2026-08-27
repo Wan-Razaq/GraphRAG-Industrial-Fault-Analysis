@@ -4,6 +4,10 @@ This document contains the diagnostic demo questions and Cypher queries used to 
 
 The natural-language questions were manually translated into Cypher queries for demonstration purposes.
 
+Related walkthrough: [GraphRAG chatbot demo video](https://drive.google.com/file/d/1Q7ImftX-rYSdK8xtI3n-F9fS_8jMF1Cw/view?usp=sharing).
+
+The video shows how the Streamlit chatbot uses a diagnostic question to retrieve graph context, generate an answer, and display the supporting Cypher query and graph evidence.
+
 \begin{longtable}{p{0.7cm} p{5.2cm} p{8.0cm}}
 \caption{Diagnostic demo questions and Cypher queries used to retrieve relevant fault-diagnosis subgraphs from Neo4j.}
 \label{tab:diagnostic_demo_questions} \\
