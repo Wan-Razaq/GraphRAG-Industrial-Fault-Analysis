@@ -277,6 +277,12 @@ Runtime flow:
 6. The answer is streamed back to the user.
 7. Graph, Cypher, and entity table views are attached to the assistant response when graph context is used.
 
+### 7. Demo Video
+
+Demo link: [GraphRAG chatbot walkthrough](https://drive.google.com/file/d/1Q7ImftX-rYSdK8xtI3n-F9fS_8jMF1Cw/view?usp=sharing)
+
+The walkthrough shows the end-user flow for the Streamlit chatbot. A user asks a maintenance troubleshooting question, the app retrieves related fault knowledge from Neo4j, the answer is generated with graph context, and the interface exposes the supporting graph visualization, Cypher query, and entity table for traceability.
+
 ## Configuration
 
 Required environment variables:
